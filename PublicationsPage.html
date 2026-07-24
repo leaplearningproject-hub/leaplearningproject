@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+	<title></title>
+	<meta name="generator" content="LibreOffice 26.2.2.2 (Linux)"/>
+	<meta name="created" content="00:00:00"/>
+	<meta name="changed" content="00:00:00"/>
+	<style type="text/css">
+		@page { size: 8.5in 11in; margin: 0.79in }
+		p { margin-bottom: 0.1in; line-height: 115%; background: transparent }
+		pre { background: transparent }
+		pre.western { font-family: "Liberation Mono", monospace; font-size: 10pt }
+		pre.cjk { font-family: "Noto Sans Mono CJK SC", monospace; font-size: 10pt }
+		pre.ctl { font-family: "Liberation Mono", monospace; font-size: 10pt }
+	</style>
+</head>
+<body lang="en-US" link="#000080" vlink="#800000" dir="ltr"><pre class="western">import React, { useEffect, useState } from &quot;react&quot;;
+
+const palette = {
+  ivory: &quot;#FAF9F8&quot;,
+  linen: &quot;#F6F4F2&quot;,
+  blush: &quot;#F5E2E7&quot;,
+  rose: &quot;#EBCFD6&quot;,
+  mauve: &quot;#D7B6C0&quot;,
+  charcoal: &quot;#2D2A2A&quot;,
+  muted: &quot;#6B6663&quot;,
+  border: &quot;#EFE7E5&quot;,
+  footer: &quot;#111111&quot;,
+};
+
+const CATEGORIES = [&quot;Research&quot;, &quot;Advocacy&quot;, &quot;Education&quot;, &quot;Community&quot;];
+
+const Eyebrow = ({ children }) =&gt; (
+  &lt;div
+    style={{
+      fontFamily: &quot;'Inter', sans-serif&quot;,
+      fontSize: &quot;11px&quot;,
+      letterSpacing: &quot;0.22em&quot;,
+      textTransform: &quot;uppercase&quot;,
+      color: palette.muted,
+      fontWeight: 500,
+    }}
+  &gt;
+    {children}
+  &lt;/div&gt;
+);
+
+const Serif = ({ children, style = {}, as = &quot;h2&quot; }) =&gt; {
+  const Tag = as;
+  return (
+    &lt;Tag
+      style={{
+        fontFamily: &quot;'Cormorant Garamond', serif&quot;,
+        color: palette.charcoal,
+        fontWeight: 500,
+        letterSpacing: &quot;-0.01em&quot;,
+        margin: 0,
+        ...style,
+      }}
+    &gt;
+      {children}
+    &lt;/Tag&gt;
+  );
+};
+
+function timeAgo(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s &lt; 60) return &quot;just now&quot;;
+  const m = Math.floor(s / 60);
+  if (m &lt; 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h &lt; 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+function initial(name) {
+  const n = (name || &quot;&quot;).trim();
+  return n ? n[0].toUpperCase() : &quot;?&quot;;
+}
+
+const inputStyle = {
+  width: &quot;100%&quot;,
+  border: `1px solid ${palette.border}`,
+  borderRadius: &quot;4px&quot;,
+  padding: &quot;12px 14px&quot;,
+  fontFamily: &quot;'Inter', sans-serif&quot;,
+  fontSize: &quot;14px&quot;,
+  background: palette.ivory,
+  color: palette.charcoal,
+  outline: &quot;none&quot;,
+};
+
+function Avatar({ name, size = 34 }) {
+  return (
+    &lt;div
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: &quot;50%&quot;,
+        background: palette.rose,
+        color: &quot;#8A5B67&quot;,
+        display: &quot;flex&quot;,
+        alignItems: &quot;center&quot;,
+        justifyContent: &quot;center&quot;,
+        fontFamily: &quot;'Inter', sans-serif&quot;,
+        fontSize: `${Math.round(size * 0.4)}px`,
+        fontWeight: 500,
+        flexShrink: 0,
+      }}
+    &gt;
+      {initial(name)}
+    &lt;/div&gt;
+  );
+}
+
+/* ---------- New Publication form ---------- */
+
+function NewPublicationForm({ onPublished }) {
+  const [title, setTitle] = useState(&quot;&quot;);
+  const [author, setAuthor] = useState(&quot;&quot;);
+  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [body, setBody] = useState(&quot;&quot;);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(&quot;&quot;);
+
+  const handleSubmit = async (e) =&gt; {
+    e.preventDefault();
+    if (!title.trim() || !body.trim()) return;
+    setSubmitting(true);
+    setError(&quot;&quot;);
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const post = {
+      id,
+      title: title.trim(),
+      author: author.trim() || &quot;Anonymous&quot;,
+      category,
+      body: body.trim(),
+      ts: Date.now(),
+    };
+    try {
+      await window.storage.set(`publications:${id}`, JSON.stringify(post), true);
+      const idx = await window.storage.get(&quot;publications:index&quot;, true);
+      const ids = idx ? JSON.parse(idx.value) : [];
+      ids.push(id);
+      await window.storage.set(&quot;publications:index&quot;, JSON.stringify(ids), true);
+      setTitle(&quot;&quot;);
+      setAuthor(&quot;&quot;);
+      setBody(&quot;&quot;);
+      setCategory(CATEGORIES[0]);
+      onPublished(id);
+    } catch (e) {
+      setError(&quot;That didn't save. Try again?&quot;);
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    &lt;form onSubmit={handleSubmit} style={{ display: &quot;flex&quot;, flexDirection: &quot;column&quot;, gap: &quot;16px&quot; }}&gt;
+      &lt;input
+        value={title}
+        onChange={(e) =&gt; setTitle(e.target.value)}
+        placeholder=&quot;Title&quot;
+        style={{ ...inputStyle, fontFamily: &quot;'Cormorant Garamond', serif&quot;, fontSize: &quot;20px&quot; }}
+      /&gt;
+      &lt;div style={{ display: &quot;flex&quot;, gap: &quot;16px&quot;, flexWrap: &quot;wrap&quot; }}&gt;
+        &lt;input
+          value={author}
+          onChange={(e) =&gt; setAuthor(e.target.value)}
+          placeholder=&quot;Your name&quot;
+          style={{ ...inputStyle, flex: 1, minWidth: &quot;160px&quot; }}
+        /&gt;
+        &lt;select
+          value={category}
+          onChange={(e) =&gt; setCategory(e.target.value)}
+          style={{ ...inputStyle, flex: 1, minWidth: &quot;160px&quot; }}
+        &gt;
+          {CATEGORIES.map((c) =&gt; (
+            &lt;option key={c} value={c}&gt;{c}&lt;/option&gt;
+          ))}
+        &lt;/select&gt;
+      &lt;/div&gt;
+      &lt;textarea
+        value={body}
+        onChange={(e) =&gt; setBody(e.target.value)}
+        placeholder=&quot;Write your piece...&quot;
+        rows={8}
+        style={{ ...inputStyle, resize: &quot;vertical&quot;, lineHeight: 1.7 }}
+      /&gt;
+      &lt;div style={{ display: &quot;flex&quot;, alignItems: &quot;center&quot;, gap: &quot;16px&quot; }}&gt;
+        &lt;button
+          type=&quot;submit&quot;
+          disabled={submitting || !title.trim() || !body.trim()}
+          style={{
+            background: palette.charcoal,
+            color: palette.ivory,
+            border: &quot;none&quot;,
+            borderRadius: &quot;999px&quot;,
+            padding: &quot;12px 28px&quot;,
+            fontFamily: &quot;'Inter', sans-serif&quot;,
+            fontSize: &quot;13px&quot;,
+            cursor: submitting ? &quot;default&quot; : &quot;pointer&quot;,
+            opacity: submitting || !title.trim() || !body.trim() ? 0.5 : 1,
+          }}
+        &gt;
+          {submitting ? &quot;Posting...&quot; : &quot;Publish&quot;}
+        &lt;/button&gt;
+        {error &amp;&amp; (
+          &lt;span style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontSize: &quot;13px&quot;, color: &quot;#B3564B&quot; }}&gt;
+            {error}
+          &lt;/span&gt;
+        )}
+      &lt;/div&gt;
+    &lt;/form&gt;
+  );
+}
+
+/* ---------- Comments (with one level of replies) ---------- */
+
+function ReplyForm({ onSubmit, onCancel }) {
+  const [name, setName] = useState(&quot;&quot;);
+  const [text, setText] = useState(&quot;&quot;);
+  return (
+    &lt;form
+      onSubmit={(e) =&gt; {
+        e.preventDefault();
+        if (!text.trim()) return;
+        onSubmit(name.trim(), text.trim());
+        setName(&quot;&quot;);
+        setText(&quot;&quot;);
+      }}
+      style={{ marginTop: &quot;12px&quot;, paddingLeft: &quot;44px&quot; }}
+    &gt;
+      &lt;input
+        value={name}
+        onChange={(e) =&gt; setName(e.target.value)}
+        placeholder=&quot;Name (optional)&quot;
+        style={{ ...inputStyle, fontSize: &quot;13px&quot;, padding: &quot;8px 12px&quot;, marginBottom: &quot;8px&quot; }}
+      /&gt;
+      &lt;textarea
+        value={text}
+        onChange={(e) =&gt; setText(e.target.value)}
+        placeholder=&quot;Write a reply...&quot;
+        rows={2}
+        style={{ ...inputStyle, fontSize: &quot;13px&quot;, padding: &quot;8px 12px&quot;, resize: &quot;vertical&quot; }}
+      /&gt;
+      &lt;div style={{ display: &quot;flex&quot;, gap: &quot;10px&quot;, marginTop: &quot;8px&quot; }}&gt;
+        &lt;button
+          type=&quot;submit&quot;
+          style={{
+            background: palette.charcoal,
+            color: palette.ivory,
+            border: &quot;none&quot;,
+            borderRadius: &quot;999px&quot;,
+            padding: &quot;6px 16px&quot;,
+            fontFamily: &quot;'Inter', sans-serif&quot;,
+            fontSize: &quot;11.5px&quot;,
+            cursor: &quot;pointer&quot;,
+          }}
+        &gt;
+          Reply
+        &lt;/button&gt;
+        &lt;button
+          type=&quot;button&quot;
+          onClick={onCancel}
+          style={{
+            background: &quot;none&quot;,
+            border: &quot;none&quot;,
+            color: palette.muted,
+            fontFamily: &quot;'Inter', sans-serif&quot;,
+            fontSize: &quot;11.5px&quot;,
+            cursor: &quot;pointer&quot;,
+          }}
+        &gt;
+          Cancel
+        &lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/form&gt;
+  );
+}
+
+function CommentThread({ comment, onReply }) {
+  const [replying, setReplying] = useState(false);
+  return (
+    &lt;div style={{ marginTop: &quot;24px&quot; }}&gt;
+      &lt;div style={{ display: &quot;flex&quot;, gap: &quot;12px&quot; }}&gt;
+        &lt;Avatar name={comment.name} /&gt;
+        &lt;div style={{ flex: 1 }}&gt;
+          &lt;div style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontSize: &quot;13px&quot;, color: palette.charcoal, fontWeight: 500 }}&gt;
+            {comment.name}
+            &lt;span style={{ color: palette.muted, fontWeight: 400, marginLeft: &quot;8px&quot;, fontSize: &quot;12px&quot; }}&gt;
+              {timeAgo(comment.ts)}
+            &lt;/span&gt;
+          &lt;/div&gt;
+          &lt;p style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontWeight: 300, fontSize: &quot;13.5px&quot;, color: palette.muted, marginTop: &quot;4px&quot;, lineHeight: 1.6 }}&gt;
+            {comment.text}
+          &lt;/p&gt;
+          &lt;button
+            onClick={() =&gt; setReplying((r) =&gt; !r)}
+            style={{
+              background: &quot;none&quot;,
+              border: &quot;none&quot;,
+              padding: 0,
+              marginTop: &quot;4px&quot;,
+              color: palette.muted,
+              fontFamily: &quot;'Inter', sans-serif&quot;,
+              fontSize: &quot;12px&quot;,
+              textDecoration: &quot;underline&quot;,
+              cursor: &quot;pointer&quot;,
+            }}
+          &gt;
+            Reply
+          &lt;/button&gt;
+
+          {(comment.replies || []).map((r, i) =&gt; (
+            &lt;div key={i} style={{ display: &quot;flex&quot;, gap: &quot;10px&quot;, marginTop: &quot;16px&quot;, paddingLeft: &quot;8px&quot; }}&gt;
+              &lt;Avatar name={r.name} size={28} /&gt;
+              &lt;div&gt;
+                &lt;div style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontSize: &quot;12.5px&quot;, color: palette.charcoal, fontWeight: 500 }}&gt;
+                  {r.name}
+                  &lt;span style={{ color: palette.muted, fontWeight: 400, marginLeft: &quot;8px&quot;, fontSize: &quot;11.5px&quot; }}&gt;
+                    {timeAgo(r.ts)}
+                  &lt;/span&gt;
+                &lt;/div&gt;
+                &lt;p style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontWeight: 300, fontSize: &quot;13px&quot;, color: palette.muted, marginTop: &quot;4px&quot;, lineHeight: 1.6 }}&gt;
+                  {r.text}
+                &lt;/p&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          ))}
+
+          {replying &amp;&amp; (
+            &lt;ReplyForm
+              onCancel={() =&gt; setReplying(false)}
+              onSubmit={(name, text) =&gt; {
+                onReply(comment.id, name, text);
+                setReplying(false);
+              }}
+            /&gt;
+          )}
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+
+function CommentsSection({ postId }) {
+  const [comments, setComments] = useState(null);
+  const [name, setName] = useState(&quot;&quot;);
+  const [text, setText] = useState(&quot;&quot;);
+
+  const load = async () =&gt; {
+    try {
+      const c = await window.storage.get(`comments:${postId}`, true);
+      setComments(c ? JSON.parse(c.value) : []);
+    } catch (e) {
+      setComments([]);
+    }
+  };
+
+  useEffect(() =&gt; {
+    load();
+  }, [postId]);
+
+  const save = async (next) =&gt; {
+    setComments(next);
+    try {
+      await window.storage.set(`comments:${postId}`, JSON.stringify(next), true);
+    } catch (e) {}
+  };
+
+  const handleSubmit = (e) =&gt; {
+    e.preventDefault();
+    if (!text.trim()) return;
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: name.trim() || &quot;Anonymous reader&quot;,
+      text: text.trim(),
+      ts: Date.now(),
+      replies: [],
+    };
+    save([...(comments || []), entry]);
+    setText(&quot;&quot;);
+  };
+
+  const handleReply = (commentId, replyName, replyText) =&gt; {
+    const next = (comments || []).map((c) =&gt;
+      c.id === commentId
+        ? {
+            ...c,
+            replies: [
+              ...(c.replies || []),
+              {
+                name: replyName || &quot;Anonymous reader&quot;,
+                text: replyText,
+                ts: Date.now(),
+              },
+            ],
+          }
+        : c
+    );
+    save(next);
+  };
+
+  if (comments === null) {
+    return (
+      &lt;p style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontSize: &quot;13.5px&quot;, color: palette.muted, marginTop: &quot;20px&quot; }}&gt;
+        Loading comments...
+      &lt;/p&gt;
+    );
+  }
+
+  return (
+    &lt;div style={{ marginTop: &quot;56px&quot; }}&gt;
+      &lt;Eyebrow&gt;{comments.length} {comments.length === 1 ? &quot;Comment&quot; : &quot;Comments&quot;}&lt;/Eyebrow&gt;
+      &lt;form onSubmit={handleSubmit} style={{ marginTop: &quot;20px&quot; }}&gt;
+        &lt;input
+          value={name}
+          onChange={(e) =&gt; setName(e.target.value)}
+          placeholder=&quot;Name (optional)&quot;
+          style={{ ...inputStyle, marginBottom: &quot;10px&quot; }}
+        /&gt;
+        &lt;textarea
+          value={text}
+          onChange={(e) =&gt; setText(e.target.value)}
+          placeholder=&quot;Share your thoughts...&quot;
+          rows={3}
+          style={{ ...inputStyle, resize: &quot;vertical&quot; }}
+        /&gt;
+        &lt;button
+          type=&quot;submit&quot;
+          style={{
+            marginTop: &quot;12px&quot;,
+            background: palette.charcoal,
+            color: palette.ivory,
+            border: &quot;none&quot;,
+            borderRadius: &quot;999px&quot;,
+            padding: &quot;10px 24px&quot;,
+            fontFamily: &quot;'Inter', sans-serif&quot;,
+            fontSize: &quot;12.5px&quot;,
+            cursor: &quot;pointer&quot;,
+          }}
+        &gt;
+          Post Comment
+        &lt;/button&gt;
+      &lt;/form&gt;
+
+      &lt;div style={{ marginTop: &quot;12px&quot; }}&gt;
+        {comments.length === 0 &amp;&amp; (
+          &lt;p style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontSize: &quot;13.5px&quot;, color: palette.muted, marginTop: &quot;24px&quot; }}&gt;
+            Be the first to comment.
+          &lt;/p&gt;
+        )}
+        {comments.slice().reverse().map((c) =&gt; (
+          &lt;CommentThread key={c.id} comment={c} onReply={handleReply} /&gt;
+        ))}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+
+/* ---------- Post detail ---------- */
+
+function PostDetail({ post, onBack }) {
+  return (
+    &lt;div&gt;
+      &lt;button
+        onClick={onBack}
+        style={{
+          background: &quot;none&quot;,
+          border: &quot;none&quot;,
+          cursor: &quot;pointer&quot;,
+          fontFamily: &quot;'Inter', sans-serif&quot;,
+          fontSize: &quot;13px&quot;,
+          color: palette.muted,
+          padding: 0,
+          marginBottom: &quot;36px&quot;,
+        }}
+      &gt;
+        ← Back to Publications
+      &lt;/button&gt;
+
+      &lt;Eyebrow&gt;{post.category}&lt;/Eyebrow&gt;
+      &lt;Serif as=&quot;h1&quot; style={{ fontSize: &quot;clamp(30px, 4.5vw, 44px)&quot;, marginTop: &quot;14px&quot;, lineHeight: 1.15 }}&gt;
+        {post.title}
+      &lt;/Serif&gt;
+
+      &lt;div style={{ display: &quot;flex&quot;, alignItems: &quot;center&quot;, gap: &quot;12px&quot;, marginTop: &quot;26px&quot;, paddingBottom: &quot;26px&quot;, borderBottom: `1px solid ${palette.border}` }}&gt;
+        &lt;Avatar name={post.author} /&gt;
+        &lt;div style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontSize: &quot;13px&quot;, color: palette.charcoal }}&gt;
+          &lt;div&gt;{post.author}&lt;/div&gt;
+          &lt;div style={{ color: palette.muted, fontSize: &quot;12px&quot; }}&gt;{timeAgo(post.ts)}&lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+
+      &lt;p
+        style={{
+          fontFamily: &quot;'Inter', sans-serif&quot;,
+          fontWeight: 300,
+          fontSize: &quot;16px&quot;,
+          lineHeight: 1.85,
+          color: palette.charcoal,
+          marginTop: &quot;32px&quot;,
+          whiteSpace: &quot;pre-wrap&quot;,
+        }}
+      &gt;
+        {post.body}
+      &lt;/p&gt;
+
+      &lt;CommentsSection postId={post.id} /&gt;
+    &lt;/div&gt;
+  );
+}
+
+/* ---------- List ---------- */
+
+function PostList({ posts, onOpen }) {
+  if (posts.length === 0) {
+    return (
+      &lt;p style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontSize: &quot;13.5px&quot;, color: palette.muted, marginTop: &quot;20px&quot; }}&gt;
+        Nothing published yet. Be the first.
+      &lt;/p&gt;
+    );
+  }
+  return (
+    &lt;div style={{ marginTop: &quot;24px&quot;, display: &quot;flex&quot;, flexDirection: &quot;column&quot; }}&gt;
+      {posts.map((p) =&gt; (
+        &lt;div
+          key={p.id}
+          className=&quot;pub-post&quot;
+          onClick={() =&gt; onOpen(p.id)}
+          style={{
+            display: &quot;flex&quot;,
+            alignItems: &quot;flex-start&quot;,
+            gap: &quot;16px&quot;,
+            borderBottom: `1px solid ${palette.border}`,
+            padding: &quot;22px 16px&quot;,
+            cursor: &quot;pointer&quot;,
+            borderRadius: &quot;4px&quot;,
+          }}
+        &gt;
+          &lt;Avatar name={p.author} /&gt;
+          &lt;div style={{ flex: 1 }}&gt;
+            &lt;Eyebrow&gt;{p.category}&lt;/Eyebrow&gt;
+            &lt;Serif as=&quot;p&quot; style={{ fontSize: &quot;19px&quot;, marginTop: &quot;8px&quot; }}&gt;{p.title}&lt;/Serif&gt;
+            &lt;div style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontSize: &quot;12.5px&quot;, color: palette.muted, marginTop: &quot;8px&quot; }}&gt;
+              {p.author} · {timeAgo(p.ts)}
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}
+
+/* ---------- Page ---------- */
+
+export default function PublicationsPage() {
+  const [posts, setPosts] = useState(null);
+  const [openId, setOpenId] = useState(null);
+
+  const loadPosts = async () =&gt; {
+    try {
+      const idx = await window.storage.get(&quot;publications:index&quot;, true);
+      const ids = idx ? JSON.parse(idx.value) : [];
+      const loaded = [];
+      for (const id of ids) {
+        try {
+          const p = await window.storage.get(`publications:${id}`, true);
+          if (p) loaded.push(JSON.parse(p.value));
+        } catch (e) {}
+      }
+      loaded.sort((a, b) =&gt; b.ts - a.ts);
+      setPosts(loaded);
+    } catch (e) {
+      setPosts([]);
+    }
+  };
+
+  useEffect(() =&gt; {
+    loadPosts();
+  }, []);
+
+  const openPost = (id) =&gt; {
+    setOpenId(id);
+    window.scrollTo({ top: 0, behavior: &quot;smooth&quot; });
+  };
+
+  const activePost = posts &amp;&amp; posts.find((p) =&gt; p.id === openId);
+
+  return (
+    &lt;div style={{ background: palette.ivory, minHeight: &quot;100vh&quot; }}&gt;
+      &lt;style&gt;{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500,600;1,400&amp;family=Inter:wght@300;400;500&amp;display=swap');
+        * { box-sizing: border-box; }
+        body { margin: 0; }
+        input::placeholder, textarea::placeholder { color: ${palette.muted}; }
+        .pub-post:hover { background: ${palette.linen}; }
+      `}&lt;/style&gt;
+
+      &lt;div style={{ maxWidth: &quot;760px&quot;, margin: &quot;0 auto&quot;, padding: &quot;64px 24px 100px&quot; }}&gt;
+        {activePost ? (
+          &lt;PostDetail post={activePost} onBack={() =&gt; setOpenId(null)} /&gt;
+        ) : (
+          &lt;&gt;
+            &lt;Eyebrow&gt;The Journal&lt;/Eyebrow&gt;
+            &lt;Serif as=&quot;h1&quot; style={{ fontSize: &quot;clamp(32px, 5vw, 48px)&quot;, marginTop: &quot;16px&quot; }}&gt;
+              Publications
+            &lt;/Serif&gt;
+            &lt;p style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontWeight: 300, fontSize: &quot;15px&quot;, color: palette.muted, marginTop: &quot;16px&quot; }}&gt;
+              A working newsroom, not a mockup. Publish a piece, and readers
+              can comment and reply below it.
+            &lt;/p&gt;
+
+            &lt;div style={{ marginTop: &quot;40px&quot; }}&gt;
+              &lt;NewPublicationForm onPublished={() =&gt; loadPosts()} /&gt;
+            &lt;/div&gt;
+
+            &lt;div style={{ marginTop: &quot;72px&quot;, paddingTop: &quot;40px&quot;, borderTop: `1px solid ${palette.border}` }}&gt;
+              &lt;Eyebrow&gt;{posts ? `${posts.length} Published` : &quot;Loading&quot;}&lt;/Eyebrow&gt;
+              {posts === null ? (
+                &lt;p style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontSize: &quot;13.5px&quot;, color: palette.muted, marginTop: &quot;20px&quot; }}&gt;
+                  Loading publications...
+                &lt;/p&gt;
+              ) : (
+                &lt;PostList posts={posts} onOpen={openPost} /&gt;
+              )}
+            &lt;/div&gt;
+          &lt;/&gt;
+        )}
+
+        &lt;div style={{ marginTop: &quot;80px&quot;, paddingTop: &quot;28px&quot;, borderTop: `1px solid ${palette.border}` }}&gt;
+          &lt;p style={{ fontFamily: &quot;'Inter', sans-serif&quot;, fontSize: &quot;12.5px&quot;, color: palette.muted }}&gt;
+            Questions about publishing here? Contact{&quot; &quot;}
+            &lt;a href=&quot;mailto:leaplearningproject@gmail.com&quot; style={{ color: palette.charcoal }}&gt;
+              leaplearningproject@gmail.com
+            &lt;/a&gt;
+          &lt;/p&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+</body>
+</html>
